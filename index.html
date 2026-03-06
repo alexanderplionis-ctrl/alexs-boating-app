@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alex's Boating App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #e8f4fb;
+    --surface: rgba(255,255,255,0.88);
+    --border: rgba(14,116,144,0.18);
+    --accent: #0369a1;
+    --text: #0f172a;
+    --muted: #475569;
+    --dim: #94a3b8;
+    --green: #16a34a;
+    --yellow: #ca8a04;
+    --orange: #ea580c;
+    --red: #dc2626;
+    --purple: #7c3aed;
+    --cyan: #0891b2;
+  }
+
+  body {
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(186,230,253,0.7) 0%, transparent 55%),
+      radial-gradient(ellipse at 80% 100%, rgba(147,210,240,0.4) 0%, transparent 55%);
+    color: var(--text);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    min-height: 100vh;
+    padding-bottom: 60px;
+  }
+
+  /* ── Header ── */
+  header {
+    background: rgba(255,255,255,0.96);
+    border-bottom: 1px solid rgba(3,105,161,0.15);
+    padding: 14px 20px;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(20px);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .header-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 0.05em; color: #0c2340; line-height: 1; }
+  .header-sub { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--accent); letter-spacing: 0.12em; margin-top: 2px; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+
+  #refresh-btn {
+    background: rgba(56,189,248,0.1);
+    border: 1px solid rgba(56,189,248,0.3);
+    border-radius: 8px; padding: 7px 14px;
+    color: var(--accent); font-family: 'Space Mono', monospace;
+    font-size: 10px; cursor: pointer; letter-spacing: 0.1em;
+    transition: background 0.2s;
+  }
+  #refresh-btn:hover { background: rgba(56,189,248,0.2); }
+  #refresh-btn:disabled { opacity: 0.5; cursor: default; }
+
+  .status-dots { display: flex; gap: 8px; }
+  .dot-group { display: flex; align-items: center; gap: 4px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); transition: background 0.4s; }
+  .dot.ok { background: var(--green); }
+  .dot.err { background: var(--red); }
+  .dot-label { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); }
+  .dot.ok + .dot-label { color: var(--green); }
+  .dot.err + .dot-label { color: var(--red); }
+
+  #last-update { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); }
+
+  /* ── Main layout ── */
+  main { max-width: 800px; margin: 0 auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Safety Banner ── */
+  #safety-banner {
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 12px; padding: 14px 18px;
+    display: none; gap: 12px;
+  }
+  #safety-banner.visible { display: flex; }
+  .banner-icon { font-size: 22px; flex-shrink: 0; }
+  .banner-text { font-family: 'Space Mono', monospace; font-size: 12px; color: #fca5a5; line-height: 1.8; }
+
+  /* ── Section cards ── */
+  .section {
+    background: var(--surface);
+    border-radius: 16px; padding: 20px 24px;
+    position: relative; overflow: hidden;
+    border: 1px solid rgba(3,105,161,0.1);
+    box-shadow: 0 2px 12px rgba(3,105,161,0.08);
+  }
+  .section::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .section.tides::before { background: linear-gradient(90deg, transparent, #0ea5e9, transparent); }
+  .section.nws::before { background: linear-gradient(90deg, transparent, var(--orange), transparent); }
+  .section.hourly::before { background: linear-gradient(90deg, transparent, #7dd3fc, transparent); }
+  .section.storm::before { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+  .section.water::before { background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+  .section.ecoli::before { background: linear-gradient(90deg, transparent, var(--purple), transparent); }
+
+  .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .section-icon { font-size: 17px; }
+  .section-title { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.15em; color: var(--accent); text-transform: uppercase; }
+  .section.tides .section-title { color: #0ea5e9; }
+  .section.nws .section-title { color: var(--orange); }
+  .section.hourly .section-title { color: #7dd3fc; }
+  .section.storm .section-title { color: var(--red); }
+  .section.water .section-title { color: var(--cyan); }
+  .section.ecoli .section-title { color: var(--purple); }
+
+  /* ── Stat boxes ── */
+  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat-row + .stat-row { margin-top: 10px; }
+  .stat-box { background: rgba(3,105,161,0.05); border-radius: 10px; padding: 12px 14px; flex: 1; min-width: 0; }
+  .stat-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 4px; }
+  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--text); line-height: 1; }
+  .stat-value.big { font-size: 34px; }
+  .stat-value .unit { font-size: 13px; color: #94a3b8; margin-left: 3px; }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.orange { color: var(--orange); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.cyan { color: var(--cyan); }
+  .stat-value.purple { color: var(--purple); }
+
+  /* ── State messages ── */
+  .loading-msg { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  .error-msg { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--red); padding: 4px 0; }
+  .ok-msg { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--green); padding: 4px 0; }
+
+  /* ── Tide rows ── */
+  .tide-list { display: flex; flex-direction: column; gap: 8px; }
+  .tide-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    border-radius: 8px; border-left: 3px solid var(--muted);
+    background: rgba(100,116,139,0.08);
+  }
+  .tide-row.high { background: rgba(56,189,248,0.08); border-left-color: var(--accent); }
+  .tide-tag { font-family: 'Bebas Neue', sans-serif; font-size: 13px; letter-spacing: 0.1em; color: var(--muted); width: 30px; }
+  .tide-row.high .tide-tag { color: var(--accent); }
+  .tide-time { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--text); flex: 1; }
+  .tide-date { font-size: 10px; color: var(--muted); }
+  .tide-height { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: #94a3b8; }
+  .tide-row.high .tide-height { color: var(--accent); }
+  .tide-height .unit { font-size: 11px; }
+
+  /* ── Hourly forecast ── */
+  .hourly-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+  .hourly-scroll::-webkit-scrollbar { height: 4px; }
+  .hourly-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 2px; }
+  .hourly-scroll::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 2px; }
+  .hourly-card {
+    flex-shrink: 0; width: 68px; background: rgba(3,105,161,0.05);
+    border-radius: 10px; padding: 10px 6px; text-align: center;
+    border: 1px solid transparent;
+  }
+  .hourly-card.rainy { border-color: rgba(248,113,113,0.3); }
+  .hourly-time { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); }
+  .hourly-icon { font-size: 20px; margin: 6px 0; }
+  .hourly-temp { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--text); }
+  .hourly-precip { font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .hourly-precip.wet { color: var(--red); }
+  .hourly-wind { font-size: 9px; color: var(--muted); }
+
+  /* ── Storm risk rows ── */
+  .storm-list { display: flex; flex-direction: column; gap: 10px; }
+  .storm-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 14px; background: rgba(3,105,161,0.04);
+    border-radius: 8px; border: 1px solid transparent;
+  }
+  .storm-row.severe { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); }
+  .storm-day { font-family: 'Space Mono', monospace; font-size: 11px; color: #94a3b8; width: 90px; }
+  .storm-bar-wrap { flex: 1; min-width: 80px; }
+  .storm-bar-bg { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .storm-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+  .storm-pct { width: 40px; text-align: right; font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--accent); }
+  .storm-desc { font-size: 11px; color: var(--muted); min-width: 110px; }
+  .storm-temps { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+
+  /* ── NWS alert cards ── */
+  .nws-card { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .nws-event { font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: var(--red); }
+  .nws-expires { font-family: 'Space Mono', monospace; font-size: 10px; color: #94a3b8; margin-top: 4px; }
+  .nws-headline { font-size: 12px; color: #cbd5e1; margin-top: 8px; line-height: 1.5; }
+
+  /* ── E.coli panel ── */
+  .ecoli-panel { background: rgba(124,58,237,0.05); border-radius: 10px; padding: 14px 16px; border: 1px solid rgba(167,139,250,0.15); }
+  .ecoli-note { font-family: 'Space Mono', monospace; font-size: 11px; color: #5b21b6; line-height: 1.7; }
+  .ecoli-items { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ecoli-item { display: flex; gap: 10px; align-items: flex-start; }
+  .ecoli-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .ecoli-item-label { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--muted); }
+  .ecoli-item-val { font-size: 12px; margin-top: 1px; }
+
+  /* ── Footer ── */
+  footer { font-family: 'Space Mono', monospace; font-size: 9px; color: #64748b; text-align: center; letter-spacing: 0.06em; line-height: 1.8; padding: 10px 0; }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .stat-value.big { font-size: 28px; }
+    .section { padding: 16px; }
+    main { padding: 12px; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span style="font-size:24px">⚓</span>
+    <div>
+      <div class="header-title">ALEX'S BOATING APP</div>
+      <div class="header-sub">38.9038°N · 77.0815°W · WASHINGTON DC</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <button id="refresh-btn" onclick="fetchAll()">⟳ REFRESH</button>
+    <div class="status-dots">
+      <div class="dot-group"><div class="dot" id="dot-wx"></div><span class="dot-label">WEATHER</span></div>
+      <div class="dot-group"><div class="dot" id="dot-tides"></div><span class="dot-label">TIDES</span></div>
+      <div class="dot-group"><div class="dot" id="dot-usgs"></div><span class="dot-label">USGS</span></div>
+      <div class="dot-group"><div class="dot" id="dot-nws"></div><span class="dot-label">NWS</span></div>
+    </div>
+    <div id="last-update"></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Safety Banner -->
+  <div id="safety-banner">
+    <div class="banner-icon">⚠️</div>
+    <div class="banner-text" id="banner-text"></div>
+  </div>
+
+  <!-- Current Conditions -->
+  <div class="section">
+    <div class="section-head"><span class="section-icon">🌡️</span><span class="section-title">Current Conditions</span></div>
+    <div id="wx-content"><div class="loading-msg">⟳ Loading weather data…</div></div>
+  </div>
+
+  <!-- Tides -->
+  <div class="section tides">
+    <div class="section-head"><span class="section-icon">🌊</span><span class="section-title">Tide Predictions · NOAA Station 8594900</span></div>
+    <div id="tides-content"><div class="loading-msg">⟳ Loading tide predictions…</div></div>
+  </div>
+
+  <!-- NWS Alerts -->
+  <div class="section nws">
+    <div class="section-head"><span class="section-icon">📡</span><span class="section-title">NWS Active Weather Alerts</span></div>
+    <div id="nws-content"><div class="loading-msg">⟳ Checking NWS alerts…</div></div>
+  </div>
+
+  <!-- Hourly Forecast -->
+  <div class="section hourly">
+    <div class="section-head"><span class="section-icon">⏱️</span><span class="section-title">12-Hour Forecast</span></div>
+    <div id="hourly-content"><div class="loading-msg">⟳ Loading forecast…</div></div>
+  </div>
+
+  <!-- Storm Risk -->
+  <div class="section storm">
+    <div class="section-head"><span class="section-icon">⛈️</span><span class="section-title">Storm &amp; Precipitation Risk</span></div>
+    <div id="storm-content"><div class="loading-msg">⟳ Loading forecast…</div></div>
+  </div>
+
+  <!-- USGS Water -->
+  <div class="section water">
+    <div class="section-head"><span class="section-icon">💧</span><span class="section-title">Water Parameters · USGS Site 01651800</span></div>
+    <div id="usgs-content"><div class="loading-msg">⟳ Loading water data…</div></div>
+  </div>
+
+  <!-- E.Coli -->
+  <div class="section ecoli">
+    <div class="section-head"><span class="section-icon">🦠</span><span class="section-title">E. Coli &amp; Water Quality Advisory</span></div>
+    <div class="ecoli-panel">
+      <div class="ecoli-note">No real-time E. coli sensors exist on this stretch of the Potomac. The DC DOEE conducts periodic lab sampling — check their portal before swimming or extended water contact.<br><br><span style="color:var(--muted)">ADVISORY STANDARDS CURRENT AS OF: </span><span id="ecoli-date" style="color:var(--accent);font-weight:700"></span></div>
+      <div class="ecoli-items">
+        <div class="ecoli-item"><div class="ecoli-dot" style="background:#f87171"></div><div><div class="ecoli-item-label">SINGLE-SAMPLE SWIM LIMIT</div><div class="ecoli-item-val" style="color:#f87171">235 CFU/100mL (EPA standard)</div></div></div>
+        <div class="ecoli-item"><div class="ecoli-dot" style="background:#fb923c"></div><div><div class="ecoli-item-label">GEOMETRIC MEAN LIMIT</div><div class="ecoli-item-val" style="color:#fb923c">126 CFU/100mL (30-day average)</div></div></div>
+        <div class="ecoli-item"><div class="ecoli-dot" style="background:#a78bfa"></div><div><div class="ecoli-item-label">DATA SOURCE</div><div class="ecoli-item-val" style="color:#a78bfa">DC DOEE Potomac Monitoring Program</div></div></div>
+        <div class="ecoli-item"><div class="ecoli-dot" style="background:#38bdf8"></div><div><div class="ecoli-item-label">CHECK CURRENT ADVISORIES</div><div class="ecoli-item-val" style="color:#38bdf8">app.waterreporter.org · DOEE BeachStatus</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    WEATHER: OPEN-METEO.COM · TIDES: NOAA CO-OPS STATION 8594900 · WATER: USGS NWIS SITE 01651800 · ALERTS: NWS<br>
+    38.9038°N 77.0815°W · REFRESH BEFORE EACH OUTING
+  </footer>
+
+</main>
+
+<script>
+const LAT = 38.903763;
+const LON = -77.081487;
+const COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+function windDir(deg) { return COMPASS[Math.round(deg / 22.5) % 16]; }
+
+function uvInfo(uv) {
+  if (uv < 3) return { label: "Low", cls: "green" };
+  if (uv < 6) return { label: "Moderate", cls: "yellow" };
+  if (uv < 8) return { label: "High", cls: "orange" };
+  if (uv < 11) return { label: "Very High", cls: "red" };
+  return { label: "Extreme", cls: "purple" };
+}
+
+function cloudLabel(p) {
+  if (p < 10) return "Clear";
+  if (p < 30) return "Mostly Clear";
+  if (p < 60) return "Partly Cloudy";
+  if (p < 85) return "Mostly Cloudy";
+  return "Overcast";
+}
+
+function turbLabel(v) {
+  if (v == null) return "Sensor offline";
+  if (v < 1) return "Crystal Clear";
+  if (v < 5) return "Very Clear";
+  if (v < 15) return "Clear";
+  if (v < 50) return "Slightly Turbid";
+  if (v < 100) return "Turbid";
+  return "Very Turbid";
+}
+
+function wxIcon(code, precip) {
+  if ((precip || 0) > 50 || code >= 95) return "⛈️";
+  if (code >= 80) return "🌧️";
+  if (code >= 61) return "🌦️";
+  if (code >= 45) return "🌫️";
+  if (code >= 2) return "⛅";
+  return "☀️";
+}
+
+function wxLabel(code) {
+  if (code >= 95) return "⛈ Storm";
+  if (code >= 80) return "🌧 Rain";
+  if (code >= 61) return "🌦 Showers";
+  if (code >= 45) return "🌫 Fog";
+  if (code >= 2) return "⛅ Cloudy";
+  return "☀ Clear";
+}
+
+function fmtTime(dtStr) {
+  if (!dtStr) return "—";
+  // NOAA format: "2026-03-05 14:30"
+  const d = new Date(dtStr.includes("T") ? dtStr : dtStr.replace(" ", "T"));
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function fmtDate(dtStr) {
+  if (!dtStr) return "";
+  const d = new Date(dtStr.includes("T") ? dtStr : dtStr.replace(" ", "T"));
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function fmtDay(dateStr) {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function setDot(id, state) {
+  const el = document.getElementById("dot-" + id);
+  if (!el) return;
+  el.className = "dot";
+  if (state === "ok") el.classList.add("ok");
+  if (state === "err") el.classList.add("err");
+  // loading = default yellow
+}
+
+function statBox(label, value, unit, sub, colorCls, big) {
+  const valHtml = value != null
+    ? `<span>${value}</span>${unit ? `<span class="unit">${unit}</span>` : ""}`
+    : `<span style="font-size:16px;color:#475569">—</span>`;
+  return `
+    <div class="stat-box">
+      <div class="stat-label">${label}</div>
+      <div class="stat-value${big ? " big" : ""}${colorCls ? " " + colorCls : ""}">${valHtml}</div>
+      ${sub ? `<div class="stat-sub">${sub}</div>` : ""}
+    </div>`;
+}
+
+// ── Collect safety alerts ──
+const safetyAlerts = [];
+
+function updateBanner() {
+  const banner = document.getElementById("safety-banner");
+  const text = document.getElementById("banner-text");
+  if (safetyAlerts.length === 0) {
+    banner.classList.remove("visible");
+  } else {
+    banner.classList.add("visible");
+    text.innerHTML = safetyAlerts.map(a => `<div>${a}</div>`).join("");
+  }
+}
+
+// ── Fetch Weather ──
+async function fetchWeather() {
+  setDot("wx", "loading");
+  const el = document.getElementById("wx-content");
+  const hourlyEl = document.getElementById("hourly-content");
+  const stormEl = document.getElementById("storm-content");
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${LAT}&longitude=${LON}` +
+      `&current=temperature_2m,windspeed_10m,winddirection_10m,cloudcover,precipitation,weathercode,uv_index` +
+      `&hourly=temperature_2m,precipitation_probability,weathercode,windspeed_10m,cloudcover` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weathercode` +
+      `&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch` +
+      `&timezone=America%2FNew_York&forecast_days=3`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const c = d.current;
+
+    // Safety checks
+    if (c.windspeed_10m > 30) safetyAlerts.push(`DANGEROUS winds: ${Math.round(c.windspeed_10m)} mph — avoid boating`);
+    else if (c.windspeed_10m > 20) safetyAlerts.push(`Strong winds: ${Math.round(c.windspeed_10m)} mph — use caution`);
+    if (c.weathercode >= 95) safetyAlerts.push(`Thunderstorm in the area — stay off the water`);
+    updateBanner();
+
+    const uv = c.uv_index;
+    const uvi = uvInfo(uv || 0);
+    const wsColor = c.windspeed_10m > 20 ? "red" : c.windspeed_10m > 12 ? "yellow" : "green";
+    const precipColor = c.precipitation > 0.1 ? "red" : "green";
+
+    el.innerHTML = `
+      <div class="stat-row">
+        ${statBox("AIR TEMP", Math.round(c.temperature_2m), "°F", null, null, true)}
+        ${statBox("WIND SPEED", Math.round(c.windspeed_10m), "mph", null, wsColor, true)}
+        ${statBox("WIND DIR", windDir(c.winddirection_10m), null, `${Math.round(c.winddirection_10m)}°`, null, true)}
+        ${statBox("CLOUD COVER", c.cloudcover + "%", null, cloudLabel(c.cloudcover), null, true)}
+      </div>
+      <div class="stat-row">
+        ${statBox("UV INDEX", uv != null ? uv.toFixed(1) : null, null, uvi.label, uvi.cls, false)}
+        ${statBox("PRECIP NOW", c.precipitation != null ? c.precipitation.toFixed(2) : null, "in/hr", null, precipColor, false)}
+        ${statBox("CONDITIONS", wxLabel(c.weathercode), null, null, null, false)}
+      </div>`;
+
+    // Hourly
+    const now = new Date();
+    let hourlyHtml = '<div class="hourly-scroll">';
+    let count = 0;
+    for (let i = 0; i < d.hourly.time.length && count < 12; i++) {
+      const t = new Date(d.hourly.time[i]);
+      if (t < now) continue;
+      const p = d.hourly.precipitation_probability[i];
+      hourlyHtml += `
+        <div class="hourly-card ${p > 50 ? "rainy" : ""}">
+          <div class="hourly-time">${t.toLocaleTimeString("en-US", { hour: "numeric", hour12: true })}</div>
+          <div class="hourly-icon">${wxIcon(d.hourly.weathercode[i], p)}</div>
+          <div class="hourly-temp">${Math.round(d.hourly.temperature_2m[i])}°</div>
+          <div class="hourly-precip ${p > 40 ? "wet" : ""}">${p}% 💧</div>
+          <div class="hourly-wind">${Math.round(d.hourly.windspeed_10m[i])}mph</div>
+        </div>`;
+      count++;
+    }
+    hourlyHtml += "</div>";
+    hourlyEl.innerHTML = hourlyHtml;
+
+    // Storm / 3-day
+    let stormHtml = '<div class="storm-list">';
+    for (let i = 0; i < d.daily.time.length; i++) {
+      const pct = d.daily.precipitation_probability_max[i];
+      const code = d.daily.weathercode[i];
+      const severe = code >= 95;
+      const barColor = pct > 70 ? "#ef4444" : pct > 40 ? "#f97316" : "#38bdf8";
+      const pctColor = pct > 70 ? "red" : pct > 40 ? "orange" : "";
+      stormHtml += `
+        <div class="storm-row ${severe ? "severe" : ""}">
+          <div class="storm-day">${fmtDay(d.daily.time[i])}</div>
+          <div class="storm-bar-wrap"><div class="storm-bar-bg"><div class="storm-bar-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
+          <div class="storm-pct" style="color:${barColor}">${pct}%</div>
+          <div class="storm-desc" style="color:${severe ? "var(--red)" : "var(--muted)"}">${severe ? "⛈️ Thunderstorm" : code >= 61 ? "🌧️ Rain" : code >= 51 ? "🌦️ Drizzle" : "☀️ Clear"}</div>
+          <div class="storm-temps">↑${Math.round(d.daily.temperature_2m_max[i])}° ↓${Math.round(d.daily.temperature_2m_min[i])}°</div>
+        </div>`;
+    }
+    stormHtml += "</div>";
+    stormEl.innerHTML = stormHtml;
+
+    setDot("wx", "ok");
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ Weather unavailable: ${e.message}</div>`;
+    hourlyEl.innerHTML = `<div class="error-msg">⚠️ Forecast unavailable</div>`;
+    stormEl.innerHTML = `<div class="error-msg">⚠️ Forecast unavailable</div>`;
+    setDot("wx", "err");
+  }
+}
+
+// ── Fetch Tides ──
+async function fetchTides() {
+  setDot("tides", "loading");
+  const el = document.getElementById("tides-content");
+  try {
+    const today = new Date();
+    const fmt = d => d.toISOString().split("T")[0].replace(/-/g, "");
+    const end = new Date(today); end.setDate(end.getDate() + 2);
+    const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter` +
+      `?begin_date=${fmt(today)}&end_date=${fmt(end)}` +
+      `&station=8594900&product=predictions&datum=MLLW` +
+      `&time_zone=lst_ldt&interval=hilo&units=english` +
+      `&application=potomac_tracker&format=json`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    const preds = d.predictions || [];
+    if (preds.length === 0) throw new Error("No predictions returned");
+
+    let html = '<div class="tide-list">';
+    for (const t of preds.slice(0, 6)) {
+      const isHigh = t.type === "H";
+      html += `
+        <div class="tide-row ${isHigh ? "high" : ""}">
+          <span class="tide-tag">${isHigh ? "HIGH" : "LOW"}</span>
+          <span class="tide-time">${fmtTime(t.t)}</span>
+          <span class="tide-date">${fmtDate(t.t)}</span>
+          <span class="tide-height">${parseFloat(t.v).toFixed(1)}<span class="unit">ft</span></span>
+        </div>`;
+    }
+    html += "</div>";
+    el.innerHTML = html;
+    setDot("tides", "ok");
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ Tide data unavailable: ${e.message}</div>`;
+    setDot("tides", "err");
+  }
+}
+
+// ── Fetch USGS ──
+// Uses the new api.waterdata.usgs.gov OGC endpoint (waterservices.usgs.gov returns 403 from browsers)
+// Each parameter_code must be fetched in a separate request; values are returned as strings.
+async function fetchUSGS() {
+  setDot("usgs", "loading");
+  const el = document.getElementById("usgs-content");
+  try {
+    const BASE = "https://api.waterdata.usgs.gov/ogcapi/v0/collections/latest-continuous/items";
+    const SITE = "USGS-01651800";
+
+    // Fetch each parameter separately in parallel (API does not support comma-separated codes)
+    const paramCodes = ["00010", "00060", "00065", "63680"];
+    const responses = await Promise.all(
+      paramCodes.map(code =>
+        fetch(`${BASE}?monitoring_location_id=${SITE}&parameter_code=${code}&f=json`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    );
+
+    const vals = {};
+    for (const d of responses) {
+      if (!d) continue;
+      for (const feature of (d.features || [])) {
+        const code = feature.properties?.parameter_code;
+        const val  = feature.properties?.value;  // correct field name is "value" not "result"
+        if (code && val != null && val !== "-999999") vals[code] = parseFloat(val);
+      }
+    }
+
+    const temp = vals["00010"] ?? null;   // °C
+    const gage = vals["00065"] ?? null;   // ft
+    const disc = vals["00060"] ?? null;   // cfs
+    const turb = vals["63680"] ?? null;   // NTU
+
+    // Safety check
+    if (gage != null && gage > 8) {
+      safetyAlerts.push(`Elevated gage height (${gage.toFixed(1)} ft) — strong currents possible`);
+      updateBanner();
+    }
+
+    const gageColor = gage != null && gage > 8 ? "red" : "";
+    const turbColor = turb != null && turb > 50 ? "red" : "";
+
+    el.innerHTML = `
+      <div class="stat-row">
+        ${temp != null ? `<div class="stat-box"><div class="stat-label">WATER TEMP</div><div class="stat-value big cyan"><span>${(temp * 9/5 + 32).toFixed(1)}</span><span class="unit">°F</span></div><div class="stat-sub">${temp.toFixed(1)}°C</div></div>` : statBox("WATER TEMP", null, "°F", "No sensor data", "cyan", true)}
+        ${statBox("GAGE HEIGHT", gage != null ? gage.toFixed(2) : null, "ft",
+            gage != null ? (gage > 8 ? "⚠️ Elevated" : "Normal range") : "No sensor data", gageColor, true)}
+      </div>
+      <div class="stat-row">
+        ${statBox("DISCHARGE RATE", disc != null ? Math.round(disc).toLocaleString() : null, "cfs", "cubic feet/sec", "", false)}
+        ${statBox("TURBIDITY", turb != null ? turb.toFixed(1) : null, "NTU", turbLabel(turb), turbColor, false)}
+      </div>`;
+
+    setDot("usgs", "ok");
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ Water data unavailable: ${e.message}</div>`;
+    setDot("usgs", "err");
+  }
+}
+
+// ── Fetch NWS Alerts ──
+async function fetchNWS() {
+  setDot("nws", "loading");
+  const el = document.getElementById("nws-content");
+  try {
+    const r = await fetch(`https://api.weather.gov/alerts/active?point=${LAT},${LON}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const alerts = d.features || [];
+    if (alerts.length === 0) {
+      el.innerHTML = `<div class="ok-msg">✓ No active NWS alerts for this area</div>`;
+    } else {
+      alerts.forEach(a => safetyAlerts.push(`NWS: ${a.properties.headline || a.properties.event}`));
+      updateBanner();
+      el.innerHTML = alerts.map(a => `
+        <div class="nws-card">
+          <div class="nws-event">${a.properties.event}</div>
+          <div class="nws-expires">Expires: ${new Date(a.properties.expires).toLocaleString("en-US", { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" })}</div>
+          <div class="nws-headline">${a.properties.headline || ""}</div>
+        </div>`).join("");
+    }
+    setDot("nws", "ok");
+  } catch (e) {
+    el.innerHTML = `<div class="error-msg">⚠️ NWS alerts unavailable: ${e.message}</div>`;
+    setDot("nws", "err");
+  }
+}
+
+// ── Main ──
+async function fetchAll() {
+  const btn = document.getElementById("refresh-btn");
+  btn.disabled = true;
+  btn.textContent = "⟳ LOADING…";
+
+  // Reset dots and alerts
+  safetyAlerts.length = 0;
+  updateBanner();
+  ["wx","tides","usgs","nws"].forEach(id => setDot(id, "loading"));
+
+  // Fetch all in parallel
+  await Promise.all([fetchWeather(), fetchTides(), fetchUSGS(), fetchNWS()]);
+
+  document.getElementById("last-update").textContent =
+    "Updated " + new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  btn.disabled = false;
+  btn.textContent = "⟳ REFRESH";
+}
+
+// Auto-load on open
+// Populate the E coli advisory date (EPA standards last updated March 2012; DOEE program ongoing)
+document.getElementById("ecoli-date").textContent =
+  new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+fetchAll();
+</script>
+</body>
+</html>
