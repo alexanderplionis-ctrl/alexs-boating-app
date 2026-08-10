@@ -45,14 +45,9 @@ Data is fetched via the USGS Water Data OGC API (`api.waterdata.usgs.gov`). Beca
 
 Following the January 2026 Potomac Interceptor collapse, DC Water initiated daily E. coli sampling at ten locations along the Potomac River, including Fletcher's Boathouse — the closest active monitoring site to the boating coordinates used in this app. Results are published on DC Water's [Water Quality Monitoring](https://www.dcwater.com/water-quality-monitoring) page as an HTML table, updated daily on weekdays.
 
-Because DC Water's page does not provide a machine-readable API, the app fetches the page via a CORS proxy chain and parses the Fletcher's Boathouse column directly in the browser — no API key or account required. The app tries four proxies in sequence until one succeeds:
+Because DC Water's page does not provide a machine-readable API, the app fetches the page via a personal Cloudflare Worker which retrieves the page server-side and returns it with the correct CORS headers. This approach is reliable on all browsers including iOS Safari, which blocks third-party CORS proxy services.
 
-1. **corsfix.com** — primary (free, unlimited requests, no key required)
-2. **allorigins.win** — first fallback (~20 requests/min)
-3. **cors.x2u.in** — second fallback (~100 requests/hour)
-4. **codetabs.com** — third fallback
-
-Note: corsproxy.io is intentionally excluded as its free tier is restricted to localhost and select development origins only and does not work reliably from file:// or hosted pages.
+The Worker is deployed at `https://dcwater-proxy.alexander-plionis.workers.dev` on Cloudflare's free tier (100,000 requests/day). A fallback chain of four public CORS proxies is also included in case the Worker is unavailable.
 
 The E. coli status dot turns **yellow** if the most recent reading is more than 3 days old (e.g. over a weekend or holiday). DC Water currently samples on weekdays; results for Saturday and Sunday are posted the following Monday.
 
@@ -70,9 +65,10 @@ Built entirely in a single self-contained HTML file using:
 - **HTML** — page structure and content
 - **CSS** — light blue nautical theme optimized for bright outdoor conditions, with Bebas Neue and Space Mono fonts
 - **JavaScript** — fetches all five data sources in parallel, parses responses, calculates safety thresholds, and dynamically renders the UI
-- **CORS Proxy Chain** — four public proxies tried in sequence to fetch DC Water's E. coli HTML table from the browser
+- **Cloudflare Worker** — personal serverless proxy (`dcwater-proxy.alexander-plionis.workers.dev`) that fetches the DC Water E. coli HTML table server-side, solving iOS Safari CORS restrictions
+- **Fallback CORS Proxies** — corsfix.com, allorigins.win, cors.x2u.in, and codetabs.com used in sequence if the Worker is unavailable
 
-**848 lines of code. Zero frontend dependencies. No build step. No backend server. No API key required.**
+**853 lines of code. Zero frontend dependencies. No build step. No backend server. No API key required.**
 
 ---
 
@@ -86,6 +82,20 @@ The safety banner at the top of the page auto-triggers when any of the following
 - Active thunderstorm (NWS weather code ≥ 95)
 - USGS gage height above 8 ft
 - E. coli at Caution (> 410) or Unsafe (> 1,000) levels at Fletcher's Boathouse
+
+---
+
+## Cloudflare Worker Setup
+
+The E. coli fetch uses a personal Cloudflare Worker to bypass iOS Safari's strict CORS policy. If you fork this project and need to set up your own Worker:
+
+1. Create a free account at [workers.cloudflare.com](https://workers.cloudflare.com)
+2. Go to **Compute → Workers & Pages → Create application → Start with Hello World**
+3. Name it `dcwater-proxy` and click **Deploy**
+4. Click **Edit code**, replace all code with the contents of `cloudflare-worker.js`, and click **Deploy**
+5. Update the `WORKER_URL` constant in `index.html` with your Worker's URL
+
+The Worker source code is included in this repository as `cloudflare-worker.js`.
 
 ---
 
@@ -107,14 +117,14 @@ To push updates to GitHub using the web browser:
 1. Right-click the file link in Claude → **Save link as...** and save as `index.html` (or `README.md`)
 2. Go to your `alexs-boating-app` repository on github.com
 3. Click the existing file → three dots ⋯ → **Delete file** → **Commit changes**
-4. Click **Add file → Upload files**, drag both files onto the upload area, click **Commit changes**
+4. Click **Add file → Upload files**, drag the new files onto the upload area, click **Commit changes**
 5. Wait ~60 seconds for GitHub Pages to rebuild — your live URL and iPhone icon update automatically
 
 ---
 
 ## Local Development
 
-Since this is a single HTML file, there is no build process. To run locally, open the file directly in any modern browser — all API calls are made directly from the browser and no local server is needed.
+Since this is a single HTML file, there is no build process. To run locally, open the file directly in any modern browser.
 
 ```bash
 git clone https://github.com/YOUR-USERNAME/alexs-boating-app.git
